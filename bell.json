@@ -1,0 +1,22 @@
+{
+  "name": "Bell State Demo",
+  "num_qubits": 2,
+  "gates": [
+    {
+      "name": "H",
+      "targets": [
+        0
+      ],
+      "controls": null
+    },
+    {
+      "name": "CNOT",
+      "targets": [
+        1
+      ],
+      "controls": [
+        0
+      ]
+    }
+  ]
+}
