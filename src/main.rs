@@ -52,6 +52,32 @@ enum Commands {
     },
 }
 
+pub fn validate_and_build_gate(gate: GateType, targets: Vec<usize>) -> Result<Gate, String> {
+    match gate {
+        GateType::CNOT => {
+            if targets.len() != 2 {
+                return Err(format!(
+                    "CNOT gate requires exactly 2 qubits (control and target). Provided: {}",
+                    targets.len()
+                ));
+            }
+            let control = targets[0];
+            let target = targets[1];
+            Ok(Gate::new(GateType::CNOT, vec![target], Some(vec![control])))
+        }
+        GateType::H | GateType::X | GateType::Z => {
+            if targets.len() != 1 {
+                return Err(format!(
+                    "{:?} gate requires exactly 1 qubit target. Provided: {}",
+                    gate,
+                    targets.len()
+                ));
+            }
+            Ok(Gate::new(gate, vec![targets[0]], None))
+        }
+    }
+}
+
 fn main() {
     let args = Cli::parse();
 
@@ -63,11 +89,15 @@ fn main() {
         Commands::AddGate { gate, targets } => {
             println!("Gate detected by CLI: {:?} on qubits {:?}", gate, targets);
 
-            // Create the gate using the constructor from domain.rs
-            // Note: For CNOT you could separate controls from targets later
-            let _new_gate = Gate::new(gate, targets, None);
-
-            println!("Gate validated and constructed successfully!");
+            match validate_and_build_gate(gate, targets) {
+                Ok(new_gate) => {
+                    println!("Gate validated and constructed successfully: {:?}", new_gate);
+                }
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
         Commands::Demo { save } => {
             let demo_name = "Bell State Demo";
@@ -163,5 +193,45 @@ mod tests {
             Cli::try_parse_from(["qsim", "export", "--from", "bell.json", "--to", "bell.qasm"]);
 
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_validate_and_build_gate_cnot_valid() {
+        let res = validate_and_build_gate(GateType::CNOT, vec![0, 1]);
+        assert!(res.is_ok());
+        let gate = res.unwrap();
+        assert_eq!(gate.name, GateType::CNOT);
+        assert_eq!(gate.targets, vec![1]);
+        assert_eq!(gate.controls, Some(vec![0]));
+    }
+
+    #[test]
+    fn test_validate_and_build_gate_cnot_invalid() {
+        let res = validate_and_build_gate(GateType::CNOT, vec![0]);
+        assert!(res.is_err());
+        assert_eq!(
+            res.unwrap_err(),
+            "CNOT gate requires exactly 2 qubits (control and target). Provided: 1"
+        );
+    }
+
+    #[test]
+    fn test_validate_and_build_gate_single_valid() {
+        let res = validate_and_build_gate(GateType::X, vec![0]);
+        assert!(res.is_ok());
+        let gate = res.unwrap();
+        assert_eq!(gate.name, GateType::X);
+        assert_eq!(gate.targets, vec![0]);
+        assert!(gate.controls.is_none());
+    }
+
+    #[test]
+    fn test_validate_and_build_gate_single_invalid() {
+        let res = validate_and_build_gate(GateType::H, vec![0, 1]);
+        assert!(res.is_err());
+        assert_eq!(
+            res.unwrap_err(),
+            "H gate requires exactly 1 qubit target. Provided: 2"
+        );
     }
 }
